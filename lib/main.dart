@@ -4,56 +4,68 @@ import 'explorer_app.dart';
 import 'explorer_ui.dart';
 
 void main() {
-  // Tizim UI overlaylarini sozlash (Status bar va navigation bar ranglari)
+  // Tizim UI ranglarini sozlash (Status bar va Navigation bar)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
   ));
 
-  runApp(const MacosFileManager());
+  runApp(const MacosFinderApp());
 }
 
-class MacosFileManager extends StatelessWidget {
-  const MacosFileManager({Key? key}) : super(key: key);
+class MacosFinderApp extends StatelessWidget {
+  const MacosFinderApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Finder X',
+      // Taskbar va Oyna sarlavhasi
+      title: 'Finder', 
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
-
-      // Ilova uchun Dark Theme (MacOS Style)
+      
+      // MacOS Dark Theme Sozlamalari
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: MacosTheme.background,
         primaryColor: MacosTheme.accent,
-        fontFamily: 'Segoe UI', // Windowsda toza ko'rinish uchun
+        fontFamily: 'Segoe UI', // Windowsda toza ko'rinish uchun standart shrift
+        
+        // Tooltips (Sichqoncha borganda chiquvchi yozuvlar)
+        tooltipTheme: TooltipThemeData(
+          decoration: BoxDecoration(
+            color: const Color(0xE6202020),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.white12),
+          ),
+          textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+        ),
 
-        // Context Menu va Dialoglar uchun style
-        dialogBackgroundColor: Colors.transparent,
-
-        // Scrollbar MacOS kabi ingichka
+        // Scrollbar (MacOS kabi ingichka va suzuvchi)
         scrollbarTheme: ScrollbarThemeData(
           thumbColor: MaterialStateProperty.all(Colors.white24),
+          trackColor: MaterialStateProperty.all(Colors.transparent),
           thickness: MaterialStateProperty.all(6),
           radius: const Radius.circular(10),
           minThumbLength: 50,
+          interactive: true,
         ),
 
-        colorScheme: const ColorScheme.dark(
-          primary: MacosTheme.accent,
-          background: MacosTheme.background,
-          surface: MacosTheme.canvasColor,
-        ),
-
-        // Text Selection Color (MacOS Blue)
+        // Text Selection (Ko'k rang)
         textSelectionTheme: const TextSelectionThemeData(
           selectionColor: MacosTheme.selection,
           selectionHandleColor: MacosTheme.accent,
+          cursorColor: MacosTheme.textPrimary,
+        ),
+        
+        colorScheme: const ColorScheme.dark(
+          primary: MacosTheme.accent,
+          background: MacosTheme.background,
+          surface: MacosTheme.sidebarBg,
         ),
       ),
-
+      
       home: const ExplorerApp(),
     );
   }
