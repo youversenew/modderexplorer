@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Keyboard events
 import 'explorer_ui.dart';
 import 'explorer_logic.dart';
 
@@ -11,342 +13,452 @@ class ExplorerApp extends StatefulWidget {
 }
 
 class _ExplorerAppState extends State<ExplorerApp> {
-  // Logic Controller
   final ExplorerController _controller = ExplorerController();
-
-  // View Mode: true = Grid, false = List
-  bool _isGridView = true;
+  final FocusNode _keyboardFocus = FocusNode(); // Klaviatura uchun
 
   @override
   void initState() {
     super.initState();
-    // Logicdagi o'zgarishlarni eshitib turish
     _controller.addListener(() {
       if (mounted) setState(() {});
+    });
+    // Ilova ochilganda klaviatura fokusini olish
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _keyboardFocus.requestFocus();
     });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _keyboardFocus.dispose();
     super.dispose();
   }
 
-  /// Faylni ochish (Windows default dasturi bilan)
-  void _openFile(String path) {
-    if (Platform.isWindows) {
-      Process.run('explorer', [path]);
+  // --- ACTIONS ---
+
+  void _handleContextMenu(TapDownDetails details, {String? filePath}) {
+    final isFile = filePath != null;
+    if (isFile && !_controller.selectedPaths.contains(filePath)) {
+      _controller.selectFile(filePath!, multiSelect: false);
+    }
+
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(details.globalPosition, details.globalPosition),
+      Offset.zero & overlay.size,
+    );
+
+    // Custom Glass Menu chiqarish
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Dismiss",
+      barrierColor: Colors.transparent,
+      pageBuilder: (_, __, ___) {
+        return Stack(
+          children: [
+            Positioned(
+              top: details.globalPosition.dy,
+              left: details.globalPosition.dx,
+              child: Material(
+                color: Colors.transparent,
+                child: MacosContextMenu(
+                  items: isFile
+                      ? _getFileMenuOptions(filePath!)
+                      : _getBgMenuOptions(),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<ContextMenuItem> _getFileMenuOptions(String path) {
+    return [
+      ContextMenuItem(
+        label: "Open",
+        icon: CupertinoIcons.arrow_up_right_square,
+        onTap: () => _controller.openFile(path),
+      ),
+      ContextMenuItem(
+        label: "Open With...",
+        icon: CupertinoIcons.square_arrow_right,
+        onTap: () => _controller.openWith(path),
+      ),
+      ContextMenuItem.divider(),
+      ContextMenuItem(
+        label: "Copy",
+        icon: CupertinoIcons.doc_on_doc,
+        shortcut: "Ctrl+C",
+        onTap: () => _controller.copyToClipboard(),
+      ),
+      ContextMenuItem(
+        label: "Cut",
+        icon: CupertinoIcons.scissors,
+        shortcut: "Ctrl+X",
+        onTap: () => _controller.copyToClipboard(isCut: true),
+      ),
+      ContextMenuItem(
+        label: "Create Shortcut",
+        icon: CupertinoIcons.link,
+        onTap: () => _controller.createShortcut(path),
+      ),
+      ContextMenuItem.divider(),
+      ContextMenuItem(
+        label: "Rename",
+        icon: CupertinoIcons.pencil,
+        shortcut: "F2",
+        onTap: () => MacosDialogs.showInput(context, "Rename File",
+            (val) => _controller.renameEntity(path, val)),
+      ),
+      ContextMenuItem(
+        label: "Delete",
+        icon: CupertinoIcons.trash,
+        shortcut: "Del",
+        onTap: _controller.deleteSelected,
+      ),
+    ];
+  }
+
+  List<ContextMenuItem> _getBgMenuOptions() {
+    return [
+      ContextMenuItem(
+        label: "New Folder",
+        icon: CupertinoIcons.folder_badge_plus,
+        onTap: () => MacosDialogs.showInput(
+            context, "New Folder Name", (val) => _controller.createFolder(val)),
+      ),
+      ContextMenuItem.divider(),
+      ContextMenuItem(
+        label: "Paste",
+        icon: CupertinoIcons.doc_on_clipboard,
+        shortcut: "Ctrl+V",
+        onTap: _controller.hasClipboard ? _controller.pasteFromClipboard : null,
+      ),
+      ContextMenuItem(
+        label: "Select All",
+        icon: CupertinoIcons.checkmark_rectangle,
+        shortcut: "Ctrl+A",
+        onTap: () {
+          for (var f in _controller.files) {
+            _controller.selectFile(f.path, multiSelect: true);
+          }
+        },
+      ),
+      ContextMenuItem(
+        label: "Refresh",
+        icon: CupertinoIcons.refresh,
+        shortcut: "F5",
+        onTap: _controller.refresh,
+      ),
+    ];
+  }
+
+  // --- KEYBOARD HANDLING ---
+  void _handleKey(RawKeyEvent event) {
+    if (event is RawKeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.delete) {
+        _controller.deleteSelected();
+      } else if (event.isControlPressed &&
+          event.logicalKey == LogicalKeyboardKey.keyA) {
+        for (var f in _controller.files) {
+          _controller.selectFile(f.path, multiSelect: true);
+        }
+      } else if (event.isControlPressed &&
+          event.logicalKey == LogicalKeyboardKey.keyC) {
+        _controller.copyToClipboard();
+      } else if (event.isControlPressed &&
+          event.logicalKey == LogicalKeyboardKey.keyV) {
+        _controller.pasteFromClipboard();
+      } else if (event.isControlPressed &&
+          event.logicalKey == LogicalKeyboardKey.keyX) {
+        _controller.copyToClipboard(isCut: true);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ModderTheme.background,
-      body: Stack(
-        children: [
-          // Background Image or Gradient (Optional depth effect)
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF0F0F0F), Color(0xFF1A1A1A)],
+      backgroundColor: Colors.black, // Fallback background
+      body: RawKeyboardListener(
+        focusNode: _keyboardFocus,
+        onKey: _handleKey,
+        child: Stack(
+          children: [
+            // 1. BACKGROUND WALLPAPER (MacOS Abstract)
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF2E0F45), // Deep Purple
+                      Color(0xFF0F1E45), // Deep Blue
+                      Color(0xFF000000), // Black
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          Row(
-            children: [
-              // -------------------------
-              // 1. SIDEBAR (Glass)
-              // -------------------------
-              GlassBox(
-                width: 260,
-                margin: const EdgeInsets.all(10),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-                tint: ModderTheme.glassLow,
-                blur: 30,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // App Logo / Title
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, bottom: 20),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.folder_special_rounded,
-                              color: ModderTheme.accent, size: 28),
-                          SizedBox(width: 10),
-                          Text(
-                            "Modder File",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
+            // 2. MAIN LAYOUT
+            Row(
+              children: [
+                // --- SIDEBAR ---
+                MacosGlassBox(
+                  width: 240,
+                  tint: MacosTheme.sidebarBg,
+                  blur: 50,
+                  borderRadius: 0, // Left side square
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 14, bottom: 20),
+                        child: MacosTrafficLights(),
                       ),
-                    ),
-
-                    // Quick Access Section
-                    _buildSectionHeader("Quick Access"),
-                    ..._controller.quickAccessPaths.entries.map((entry) {
-                      return FileListItem(
-                        name: entry.key,
-                        isDirectory: true,
-                        isSelected: _controller.currentPath == entry.value,
-                        customIcon: _getQuickIcon(entry.key),
-                        onTap: () => _controller.navigateTo(entry.value),
-                      );
-                    }),
-
-                    const SizedBox(height: 20),
-
-                    // Drives Section
-                    _buildSectionHeader("Drives"),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _controller.drives.length,
-                        itemBuilder: (context, index) {
-                          final drive = _controller.drives[index];
-                          return FileListItem(
-                            name: drive,
-                            isDirectory: true,
-                            customIcon: Icons.storage_rounded,
-                            isSelected:
-                                _controller.currentPath.startsWith(drive) &&
-                                    _controller.currentPath.length == 3,
-                            onTap: () => _controller.navigateTo(drive),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // -------------------------
-              // 2. MAIN CONTENT AREA
-              // -------------------------
-              Expanded(
-                child: Column(
-                  children: [
-                    // TOP BAR
-                    Container(
-                      height: 80,
-                      padding: const EdgeInsets.fromLTRB(0, 20, 20, 10),
-                      child: Row(
-                        children: [
-                          // Navigation Buttons
-                          IconButton(
-                            onPressed: _controller.canGoBack
-                                ? _controller.goBack
-                                : null,
-                            icon: Icon(Icons.arrow_back_ios_new_rounded,
-                                color: _controller.canGoBack
-                                    ? Colors.white
-                                    : Colors.white24,
-                                size: 18),
-                          ),
-                          IconButton(
-                            onPressed: _controller.canGoForward
-                                ? _controller.goForward
-                                : null,
-                            icon: Icon(Icons.arrow_forward_ios_rounded,
-                                color: _controller.canGoForward
-                                    ? Colors.white
-                                    : Colors.white24,
-                                size: 18),
-                          ),
-                          IconButton(
-                            onPressed: _controller.goToParent,
-                            icon: const Icon(Icons.arrow_upward_rounded,
-                                color: Colors.white70, size: 20),
-                          ),
-
-                          const SizedBox(width: 10),
-
-                          // Address Bar
-                          Expanded(
-                            child: ModernAddressBar(
-                              path: _controller.currentPath,
-                              onSubmitted: (value) =>
-                                  _controller.navigateTo(value),
-                            ),
-                          ),
-
-                          const SizedBox(width: 15),
-
-                          // View Toggle
-                          IconButton(
-                            onPressed: () =>
-                                setState(() => _isGridView = !_isGridView),
-                            icon: Icon(
-                              _isGridView
-                                  ? Icons.grid_view_rounded
-                                  : Icons.view_list_rounded,
-                              color: ModderTheme.accent,
-                            ),
-                            tooltip: "Switch View",
-                          ),
-
-                          // Search Box
-                          ModernSearchBox(onChanged: (val) {
-                            // Search logic implementation would go here (filtering _controller.files)
-                            // For minimal requirements, we just keep the UI ready.
-                          }),
-                        ],
-                      ),
-                    ),
-
-                    // FILE GRID / LIST
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 10, bottom: 10),
-                        decoration: BoxDecoration(
-                          color: ModderTheme.glassLow,
-                          borderRadius:
-                              BorderRadius.circular(ModderTheme.radiusM),
-                          border: Border.all(color: ModderTheme.glassBorder),
+                      _sidebarHeader("Favorites"),
+                      ..._controller.quickAccessPaths.entries
+                          .map((e) => MacosSidebarItem(
+                                label: e.key,
+                                icon: _getIconForPath(e.key),
+                                isSelected: _controller.currentPath == e.value,
+                                onTap: () => _controller.navigateTo(e.value),
+                              )),
+                      const SizedBox(height: 20),
+                      _sidebarHeader("Locations"),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _controller.drives.length,
+                          itemBuilder: (context, index) {
+                            final drive = _controller.drives[index];
+                            return MacosSidebarItem(
+                              label: drive,
+                              icon: CupertinoIcons.device_laptop,
+                              isSelected:
+                                  _controller.currentPath.startsWith(drive) &&
+                                      _controller.currentPath.length < 5,
+                              onTap: () => _controller.navigateTo(drive),
+                            );
+                          },
                         ),
-                        child: ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(ModderTheme.radiusM),
-                          child: Stack(
-                            children: [
-                              // Loading Indicator
-                              if (_controller.isLoading)
-                                const Center(
-                                    child: CircularProgressIndicator(
-                                        color: ModderTheme.accent)),
+                      ),
+                    ],
+                  ),
+                ),
 
-                              // Error Message
-                              if (_controller.errorMessage != null)
-                                Positioned(
-                                  bottom: 20,
-                                  left: 20,
-                                  right: 20,
-                                  child: GlassBox(
-                                    tint: ModderTheme.danger.withOpacity(0.2),
-                                    child: Text(
-                                      _controller.errorMessage!,
-                                      style: const TextStyle(
-                                          color: ModderTheme.danger),
-                                      textAlign: TextAlign.center,
+                // --- MAIN CONTENT ---
+                Expanded(
+                  child: Column(
+                    children: [
+                      // TOOLBAR
+                      Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        color: Colors.transparent,
+                        child: Row(
+                          children: [
+                            IconButton(
+                              onPressed: _controller.canGoBack
+                                  ? _controller.goBack
+                                  : null,
+                              icon: const Icon(CupertinoIcons.back, size: 20),
+                              color: _controller.canGoBack
+                                  ? Colors.white
+                                  : Colors.white24,
+                              splashRadius: 20,
+                            ),
+                            IconButton(
+                              onPressed: _controller.canGoForward
+                                  ? _controller.goForward
+                                  : null,
+                              icon:
+                                  const Icon(CupertinoIcons.forward, size: 20),
+                              color: _controller.canGoForward
+                                  ? Colors.white
+                                  : Colors.white24,
+                              splashRadius: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              _controller.currentPath.split('\\').last.isEmpty
+                                  ? "My Computer"
+                                  : _controller.currentPath.split('\\').last,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
+                            ),
+                            const Spacer(),
+                            // SPOTLIGHT SEARCH
+                            SpotlightSearchBar(
+                              onChanged: _controller.search,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // FILE GRID AREA
+                      Expanded(
+                        child: MacosGlassBox(
+                          margin: const EdgeInsets.fromLTRB(0, 0, 10, 10),
+                          tint: MacosTheme.contentBg,
+                          blur: 40,
+                          borderRadius: MacosTheme.radiusL,
+                          child: GestureDetector(
+                            onSecondaryTapDown: (d) => _handleContextMenu(
+                                d), // Empty space right click
+                            child: Stack(
+                              children: [
+                                if (_controller.isLoading)
+                                  const Center(
+                                      child: CupertinoActivityIndicator(
+                                          color: Colors.white, radius: 15)),
+
+                                if (!_controller.isLoading)
+                                  GridView.builder(
+                                    padding: const EdgeInsets.all(20),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                                      maxCrossAxisExtent: 130,
+                                      childAspectRatio: 0.85,
+                                      crossAxisSpacing: 15,
+                                      mainAxisSpacing: 15,
+                                    ),
+                                    itemCount: _controller.files.length,
+                                    itemBuilder: (context, index) {
+                                      final entity = _controller.files[index];
+                                      final name = entity.uri.pathSegments
+                                          .lastWhere((e) => e.isNotEmpty);
+                                      final isDir = entity is Directory;
+
+                                      return Draggable<String>(
+                                        data: entity.path,
+                                        feedback: Material(
+                                          color: Colors.transparent,
+                                          child: Opacity(
+                                            opacity: 0.7,
+                                            child: Icon(
+                                              isDir
+                                                  ? CupertinoIcons.folder_solid
+                                                  : CupertinoIcons.doc_fill,
+                                              size: 60,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                        child: DragTarget<String>(
+                                          onAccept: (droppedPath) =>
+                                              _controller.moveEntity(
+                                                  droppedPath, entity.path),
+                                          builder: (context, candidateData,
+                                              rejectedData) {
+                                            return MacosFileCard(
+                                              name: name,
+                                              isDirectory: isDir,
+                                              size: ExplorerController
+                                                  .getFileSize(entity),
+                                              isSelected: _controller
+                                                  .selectedPaths
+                                                  .contains(entity.path),
+                                              onTap: () {
+                                                final isMulti = HardwareKeyboard
+                                                    .instance.isControlPressed;
+                                                _controller.selectFile(
+                                                    entity.path,
+                                                    multiSelect: isMulti);
+                                              },
+                                              onDoubleTap: () {
+                                                if (isDir) {
+                                                  _controller
+                                                      .navigateTo(entity.path);
+                                                } else {
+                                                  _controller
+                                                      .openFile(entity.path);
+                                                }
+                                              },
+                                              onContextTap: () {
+                                                // Context menu handling is complex here,
+                                                // usually we need global position.
+                                                // For simplicity, user right clicks and we assume current mouse pos.
+                                                // Implemented via Listener in wrapping widget usually,
+                                                // but for individual item:
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  ),
+
+                                // Status Message Overlay (Copy/Paste notification)
+                                if (_controller.statusMessage != null)
+                                  Positioned(
+                                    bottom: 20,
+                                    right: 20,
+                                    child: MacosGlassBox(
+                                      tint: MacosTheme.accent.withOpacity(0.8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 8),
+                                      borderRadius: 20,
+                                      child: Text(
+                                        _controller.statusMessage!,
+                                        style: const TextStyle(
+                                            color: Colors.white, fontSize: 12),
+                                      ),
                                     ),
                                   ),
-                                ),
-
-                              // Content
-                              if (!_controller.isLoading)
-                                _isGridView ? _buildGrid() : _buildList(),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Grid View Implementation
-  Widget _buildGrid() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 140, // Item width
-        childAspectRatio: 0.8, // Ratio
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: _controller.files.length,
-      itemBuilder: (context, index) {
-        final entity = _controller.files[index];
-        final name = entity.uri.pathSegments.lastWhere((e) => e.isNotEmpty);
-        final isDir = entity is Directory;
-
-        return FileGridItem(
-          name: name,
-          isDirectory: isDir,
-          size: ExplorerController.getFileSize(entity),
-          onTap: () {
-            if (isDir) {
-              _controller.navigateTo(entity.path);
-            } else {
-              _openFile(entity.path);
-            }
-          },
-        );
-      },
-    );
-  }
-
-  // List View Implementation
-  Widget _buildList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(10),
-      itemCount: _controller.files.length,
-      itemBuilder: (context, index) {
-        final entity = _controller.files[index];
-        final name = entity.uri.pathSegments.lastWhere((e) => e.isNotEmpty);
-        final isDir = entity is Directory;
-
-        return FileListItem(
-          name: name,
-          isDirectory: isDir,
-          onTap: () {
-            if (isDir) {
-              _controller.navigateTo(entity.path);
-            } else {
-              _openFile(entity.path);
-            }
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, bottom: 8, top: 10),
-      child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(
-          color: Colors.white38,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  IconData _getQuickIcon(String key) {
+  Widget _sidebarHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, bottom: 8, top: 10),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white30,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  IconData _getIconForPath(String key) {
     switch (key) {
       case 'Desktop':
-        return Icons.desktop_windows_rounded;
+        return CupertinoIcons.desktopcomputer;
       case 'Documents':
-        return Icons.article_rounded;
+        return CupertinoIcons.doc_text;
       case 'Downloads':
-        return Icons.download_rounded;
-      case 'Pictures':
-        return Icons.image_rounded;
+        return CupertinoIcons.arrow_down_circle;
       case 'Music':
-        return Icons.music_note_rounded;
+        return CupertinoIcons.music_note_2;
+      case 'Pictures':
+        return CupertinoIcons.photo;
       default:
-        return Icons.folder_rounded;
+        return CupertinoIcons.folder;
     }
   }
 }

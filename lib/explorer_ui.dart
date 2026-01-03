@@ -1,59 +1,56 @@
 import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-/// 🎨 MODDER UI DESIGN SYSTEM
-/// A Windows 11/12 inspired Dark Glass theme.
+/// 🍎 MACOS GLASS UI SYSTEM
+/// Native MacOS Sequoia & Finder aesthetic without external plugins.
 
-class ModderTheme {
-  // -- Colors --
-  static const Color background = Color(0xFF0F0F0F); // Deep dark background
-  static const Color surface = Color(0xFF1E1E1E); // Fallback surface
-  static const Color accent = Color(0xFF60CDFF); // Windows 11 Blue/Cyan
-  static const Color danger = Color(0xFFFF453A);
+class MacosTheme {
+  // -- System Colors --
+  static const Color background = Color(0xFF000000); // Pure Dark
+  static const Color canvasColor = Color(0xFF1E1E1E);
+  static const Color accent = Color(0xFF007AFF); // System Blue
+  static const Color selection = Color(0xFF0058D0); // Darker Blue for selection
 
-  // -- Glass Colors (with Opacity) --
-  static const Color glassLow = Color(0x1AFFFFFF); // Subtle 10%
-  static const Color glassMedium = Color(0x26FFFFFF); // Medium 15%
-  static const Color glassHigh = Color(0x40FFFFFF); // High 25%
-  static const Color glassBorder = Color(0x1FFFFFFF); // Thin border
+  // -- Glass Layers --
+  static const Color sidebarBg = Color(0xCC2C2C2C); // High opacity sidebar
+  static const Color contentBg = Color(0xCC181818); // Main content
+  static const Color glassBorder = Color(0x1FFFFFFF);
 
-  // -- Text Colors --
+  // -- Text --
   static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFFAAAAAA);
+  static const Color textSecondary = Color(0xFF98989D); // Apple Gray
 
   // -- Dimensions --
-  static const double radiusS = 8.0;
-  static const double radiusM = 12.0;
-  static const double radiusL = 16.0;
+  static const double radiusS = 6.0;
+  static const double radiusM = 10.0;
+  static const double radiusL = 14.0;
 }
 
 // -----------------------------------------------------------------------------
-// 🧱 CORE WIDGETS (Glassmorphism)
+// 🧱 GLASS CORE (Acrylic Effect)
 // -----------------------------------------------------------------------------
 
-/// A container that applies a BackdropFilter (Blur) + Semi-transparent gradient.
-class GlassBox extends StatelessWidget {
+class MacosGlassBox extends StatelessWidget {
   final Widget child;
-  final double width;
-  final double? height;
-  final EdgeInsets padding;
-  final EdgeInsets margin;
+  final double? width, height;
+  final EdgeInsets padding, margin;
   final double borderRadius;
-  final Color tint;
   final double blur;
+  final Color tint;
   final Border? border;
   final VoidCallback? onTap;
 
-  const GlassBox({
+  const MacosGlassBox({
     Key? key,
     required this.child,
-    this.width = double.infinity,
+    this.width,
     this.height,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(0),
     this.margin = EdgeInsets.zero,
-    this.borderRadius = ModderTheme.radiusM,
-    this.tint = ModderTheme.glassLow,
-    this.blur = 20.0,
+    this.borderRadius = MacosTheme.radiusM,
+    this.blur = 25.0,
+    this.tint = Colors.black26,
     this.border,
     this.onTap,
   }) : super(key: key);
@@ -67,21 +64,20 @@ class GlassBox extends StatelessWidget {
         child: Container(
           width: width,
           height: height,
+          padding: padding,
           decoration: BoxDecoration(
             color: tint,
             borderRadius: BorderRadius.circular(borderRadius),
-            border:
-                border ?? Border.all(color: ModderTheme.glassBorder, width: 1),
+            border: border ??
+                Border.all(color: Colors.white.withOpacity(0.08), width: 0.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 15,
-                spreadRadius: -5,
-                offset: const Offset(0, 10),
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          padding: padding,
           child: child,
         ),
       ),
@@ -90,107 +86,426 @@ class GlassBox extends StatelessWidget {
     if (onTap != null) {
       return Padding(
         padding: margin,
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(borderRadius),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(borderRadius),
-            hoverColor: ModderTheme.accent.withOpacity(0.1),
-            splashColor: ModderTheme.accent.withOpacity(0.2),
-            child: box,
-          ),
+        child: GestureDetector(
+          onTap: onTap,
+          child: MouseRegion(cursor: SystemMouseCursors.click, child: box),
         ),
       );
     }
-
     return Padding(padding: margin, child: box);
   }
 }
 
 // -----------------------------------------------------------------------------
-// 📂 FILE & FOLDER WIDGETS
+// 🔍 SPOTLIGHT SEARCH UI
 // -----------------------------------------------------------------------------
 
-/// Visual representation of a File or Folder in Grid View
-class FileGridItem extends StatefulWidget {
+class SpotlightSearchBar extends StatefulWidget {
+  final ValueChanged<String> onChanged;
+  const SpotlightSearchBar({Key? key, required this.onChanged})
+      : super(key: key);
+
+  @override
+  State<SpotlightSearchBar> createState() => _SpotlightSearchBarState();
+}
+
+class _SpotlightSearchBarState extends State<SpotlightSearchBar> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() => _isFocused = _focusNode.hasFocus);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: _isFocused ? 400 : 250, // Expands when clicked
+        height: 36,
+        decoration: BoxDecoration(
+          color: _isFocused ? const Color(0xFF3A3A3C) : const Color(0xFF2C2C2E),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: _isFocused
+                ? MacosTheme.accent.withOpacity(0.5)
+                : Colors.transparent,
+            width: 1.5,
+          ),
+          boxShadow: _isFocused
+              ? [
+                  BoxShadow(
+                      color: MacosTheme.accent.withOpacity(0.2), blurRadius: 15)
+                ]
+              : [],
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 10),
+            Icon(CupertinoIcons.search,
+                color: MacosTheme.textSecondary, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                focusNode: _focusNode,
+                onChanged: widget.onChanged,
+                style: const TextStyle(
+                    color: MacosTheme.textPrimary,
+                    fontSize: 13,
+                    fontFamily: '.SF Pro Text'),
+                cursorColor: MacosTheme.accent,
+                decoration: const InputDecoration(
+                  hintText: "Spotlight Search",
+                  hintStyle: TextStyle(color: Colors.white24),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.only(bottom: 12),
+                ),
+              ),
+            ),
+            if (_isFocused) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text("ESC",
+                    style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold)),
+              ),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 📁 FINDER GRID ITEM (MacOS Style)
+// -----------------------------------------------------------------------------
+
+class MacosFileCard extends StatefulWidget {
   final String name;
   final String? size;
   final bool isDirectory;
-  final VoidCallback onTap;
   final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback onDoubleTap;
+  final VoidCallback onContextTap;
 
-  const FileGridItem({
+  const MacosFileCard({
     Key? key,
     required this.name,
     this.size,
     required this.isDirectory,
+    required this.isSelected,
     required this.onTap,
-    this.isSelected = false,
+    required this.onDoubleTap,
+    required this.onContextTap,
   }) : super(key: key);
 
   @override
-  State<FileGridItem> createState() => _FileGridItemState();
+  State<MacosFileCard> createState() => _MacosFileCardState();
 }
 
-class _FileGridItemState extends State<FileGridItem>
-    with SingleTickerProviderStateMixin {
+class _MacosFileCardState extends State<MacosFileCard> {
   bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final bool active = widget.isSelected || _isHovered;
-    final Color bgTint = active ? ModderTheme.glassMedium : Colors.transparent;
-    final Color borderTint = widget.isSelected
-        ? ModderTheme.accent.withOpacity(0.5)
-        : (active ? ModderTheme.glassHigh : Colors.transparent);
+    // Selection style in Finder is a darker rounded rect background + white text
+    final bool active = widget.isSelected;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+    return GestureDetector(
+      onTap: widget.onTap,
+      onDoubleTap: widget.onDoubleTap,
+      onSecondaryTap: widget.onContextTap, // Right click
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: Container(
           decoration: BoxDecoration(
-            color: bgTint,
-            borderRadius: BorderRadius.circular(ModderTheme.radiusM),
-            border: Border.all(color: borderTint, width: 1.5),
+            color: active
+                ? MacosTheme.selection.withOpacity(0.4)
+                : (_isHovered
+                    ? Colors.white.withOpacity(0.05)
+                    : Colors.transparent),
+            borderRadius: BorderRadius.circular(MacosTheme.radiusM),
+            border: active
+                ? Border.all(
+                    color: MacosTheme.accent.withOpacity(0.6), width: 1)
+                : Border.all(color: Colors.transparent),
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon Layer
-              Icon(
-                FileIconHelper.getIcon(widget.isDirectory, widget.name),
-                size: 48,
-                color: FileIconHelper.getColor(widget.isDirectory, widget.name),
-              ),
-              const SizedBox(height: 12),
-              // Text Layer
-              Text(
-                widget.name,
-                style: const TextStyle(
-                  color: ModderTheme.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  overflow: TextOverflow.ellipsis,
+              // 1. Icon (Rich 3D feel)
+              _buildMacosIcon(widget.isDirectory, widget.name),
+              const SizedBox(height: 8),
+
+              // 2. Text Label
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: active ? MacosTheme.selection : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
                 ),
-                maxLines: 2,
-                textAlign: TextAlign.center,
+                child: Text(
+                  widget.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MacosTheme.textPrimary,
+                    fontSize: 12,
+                    height: 1.1,
+                  ),
+                ),
               ),
-              if (widget.size != null && !widget.isDirectory) ...[
+
+              if (!widget.isDirectory && widget.size != null) ...[
                 const SizedBox(height: 4),
                 Text(
                   widget.size!,
-                  style: const TextStyle(
-                    color: ModderTheme.textSecondary,
+                  style: TextStyle(
+                    color: active ? Colors.white70 : MacosTheme.textSecondary,
                     fontSize: 10,
                   ),
                 ),
-              ]
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMacosIcon(bool isDir, String name) {
+    // Simulating MacOS icons with colors and gradients
+    if (isDir) {
+      return Icon(
+        CupertinoIcons.folder_solid,
+        size: 52,
+        color: Color(0xFF1CB5E0), // MacOS Blue Folder color
+      );
+    }
+
+    final ext = name.split('.').last.toLowerCase();
+    IconData icon;
+    Color color;
+
+    switch (ext) {
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+        icon = CupertinoIcons.photo;
+        color:
+        Colors.purpleAccent;
+        break;
+      case 'pdf':
+        icon = CupertinoIcons.doc_text_fill;
+        color:
+        Colors.redAccent;
+        break;
+      case 'mp3':
+      case 'wav':
+        icon = CupertinoIcons.music_note_2;
+        color:
+        Colors.pinkAccent;
+        break;
+      case 'mp4':
+      case 'mov':
+        icon = CupertinoIcons.film;
+        color:
+        Colors.orangeAccent;
+        break;
+      case 'zip':
+      case 'rar':
+        icon = CupertinoIcons.archivebox_fill;
+        color:
+        Colors.yellow;
+        break;
+      case 'exe':
+      case 'app':
+        icon = CupertinoIcons.app_badge_fill;
+        color:
+        Colors.white70;
+        break;
+      default:
+        icon = CupertinoIcons.doc_fill;
+        color:
+        Colors.grey;
+    }
+
+    return Icon(icon, size: 48, color: Colors.grey);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 🪟 WINDOW CONTROLS (Traffic Lights)
+// -----------------------------------------------------------------------------
+
+class MacosTrafficLights extends StatelessWidget {
+  const MacosTrafficLights({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _circle(const Color(0xFFFF5F57)), // Close (Red)
+        const SizedBox(width: 8),
+        _circle(const Color(0xFFFEBC2E)), // Minimize (Yellow)
+        const SizedBox(width: 8),
+        _circle(const Color(0xFF28C840)), // Maximize (Green)
+      ],
+    );
+  }
+
+  Widget _circle(Color color) {
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 📋 CONTEXT MENU (Custom Dialog)
+// -----------------------------------------------------------------------------
+
+class MacosContextMenu extends StatelessWidget {
+  final List<ContextMenuItem> items;
+  const MacosContextMenu({Key? key, required this.items}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MacosGlassBox(
+      width: 200,
+      blur: 40,
+      tint: const Color(0xCC252525), // Very Dark Grey
+      borderRadius: 10,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      border: Border.all(color: Colors.white24, width: 0.5),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: items.map((item) {
+          if (item.isDivider) {
+            return const Divider(
+                color: Colors.white12, height: 10, thickness: 1);
+          }
+          return InkWell(
+            onTap: () {
+              Navigator.pop(context);
+              item.onTap?.call();
+            },
+            hoverColor: MacosTheme.accent, // Blue highlight on hover
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  if (item.icon != null) ...[
+                    Icon(item.icon, size: 16, color: Colors.white),
+                    const SizedBox(width: 10),
+                  ],
+                  Text(item.label ?? "",
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 13)),
+                  const Spacer(),
+                  if (item.shortcut != null)
+                    Text(item.shortcut!,
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 11)),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class ContextMenuItem {
+  final String? label;
+  final IconData? icon;
+  final String? shortcut;
+  final VoidCallback? onTap;
+  final bool isDivider;
+
+  ContextMenuItem(
+      {this.label,
+      this.icon,
+      this.shortcut,
+      this.onTap,
+      this.isDivider = false});
+  static ContextMenuItem divider() => ContextMenuItem(isDivider: true);
+}
+
+// -----------------------------------------------------------------------------
+// 🧊 SIDEBAR ITEM
+// -----------------------------------------------------------------------------
+
+class MacosSidebarItem extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const MacosSidebarItem({
+    Key? key,
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Colors.white.withOpacity(0.12)
+                : Colors.transparent, // Mac style active
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected
+                    ? MacosTheme.accent
+                    : const Color(0xFFB0B0B5), // Blue if active, Gray otherwise
+              ),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFFD0D0D0),
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
             ],
           ),
         ),
@@ -199,201 +514,73 @@ class _FileGridItemState extends State<FileGridItem>
   }
 }
 
-/// Visual representation of a File or Folder in List/Sidebar View
-class FileListItem extends StatelessWidget {
-  final String name;
-  final bool isDirectory;
-  final VoidCallback onTap;
-  final bool isSelected;
-  final IconData? customIcon;
-
-  const FileListItem({
-    Key? key,
-    required this.name,
-    required this.isDirectory,
-    required this.onTap,
-    this.isSelected = false,
-    this.customIcon,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: isSelected ? ModderTheme.glassMedium : Colors.transparent,
-        borderRadius: BorderRadius.circular(ModderTheme.radiusS),
-        border: isSelected
-            ? Border.all(color: ModderTheme.glassBorder)
-            : Border.all(color: Colors.transparent),
-      ),
-      child: ListTile(
-        onTap: onTap,
-        dense: true,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(ModderTheme.radiusS)),
-        hoverColor: ModderTheme.glassLow,
-        leading: Icon(
-          customIcon ?? FileIconHelper.getIcon(isDirectory, name),
-          color: customIcon != null
-              ? ModderTheme.accent
-              : FileIconHelper.getColor(isDirectory, name),
-          size: 20,
-        ),
-        title: Text(
-          name,
-          style: TextStyle(
-            color: isSelected ? ModderTheme.accent : ModderTheme.textPrimary,
-            fontSize: 13,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-    );
-  }
-}
-
 // -----------------------------------------------------------------------------
-// 🛠 UTILITIES
+// 💬 DIALOGS (Alerts)
 // -----------------------------------------------------------------------------
 
-class FileIconHelper {
-  static IconData getIcon(bool isDirectory, String name) {
-    if (isDirectory) return Icons.folder_rounded;
-
-    final ext = name.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'png':
-      case 'jpg':
-      case 'jpeg':
-      case 'gif':
-        return Icons.image_rounded;
-      case 'mp4':
-      case 'mov':
-      case 'avi':
-        return Icons.movie_rounded;
-      case 'mp3':
-      case 'wav':
-        return Icons.music_note_rounded;
-      case 'pdf':
-        return Icons.picture_as_pdf_rounded;
-      case 'txt':
-      case 'md':
-      case 'json':
-      case 'dart':
-        return Icons.description_rounded;
-      case 'exe':
-      case 'bat':
-        return Icons.terminal_rounded;
-      case 'zip':
-      case 'rar':
-        return Icons.folder_zip_rounded;
-      default:
-        return Icons.insert_drive_file_rounded;
-    }
-  }
-
-  static Color getColor(bool isDirectory, String name) {
-    if (isDirectory) return const Color(0xFFFFD54F); // Windows Yellow
-
-    final ext = name.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'png':
-      case 'jpg':
-        return Colors.purpleAccent;
-      case 'mp4':
-        return Colors.redAccent;
-      case 'pdf':
-        return Colors.red;
-      case 'dart':
-        return Colors.blueAccent;
-      case 'exe':
-        return ModderTheme.accent;
-      case 'zip':
-        return Colors.orangeAccent;
-      default:
-        return ModderTheme.textSecondary;
-    }
-  }
-}
-
-// -----------------------------------------------------------------------------
-// ⌨️ INPUTS & BUTTONS
-// -----------------------------------------------------------------------------
-
-class ModernAddressBar extends StatelessWidget {
-  final String path;
-  final ValueChanged<String> onSubmitted;
-
-  const ModernAddressBar({
-    Key? key,
-    required this.path,
-    required this.onSubmitted,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = TextEditingController(text: path);
-    return GlassBox(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      borderRadius: ModderTheme.radiusS,
-      blur: 10,
-      tint: Colors.black12,
-      child: Row(
-        children: [
-          const Icon(Icons.computer, color: ModderTheme.accent, size: 16),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onSubmitted: onSubmitted,
-              style:
-                  const TextStyle(color: ModderTheme.textPrimary, fontSize: 13),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.only(bottom: 4),
+class MacosDialogs {
+  static void showInput(
+      BuildContext context, String title, Function(String) onConfirm) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: MacosGlassBox(
+          width: 320,
+          blur: 30,
+          tint: const Color(0xEE2A2A2A),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.pencil_outline,
+                  size: 40, color: Colors.white70),
+              const SizedBox(height: 15),
+              Text(title,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              CupertinoTextField(
+                controller: controller,
+                style: const TextStyle(color: Colors.white),
+                cursorColor: MacosTheme.accent,
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white12),
+                ),
               ),
-              cursorColor: ModderTheme.accent,
-            ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Cancel",
+                        style: TextStyle(color: Colors.white54)),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: MacosTheme.accent,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () {
+                      onConfirm(controller.text);
+                      Navigator.pop(context);
+                    },
+                    child:
+                        const Text("OK", style: TextStyle(color: Colors.white)),
+                  )
+                ],
+              )
+            ],
           ),
-          const SizedBox(width: 8),
-          const Icon(Icons.refresh_rounded,
-              color: ModderTheme.textSecondary, size: 16),
-        ],
-      ),
-    );
-  }
-}
-
-class ModernSearchBox extends StatelessWidget {
-  final ValueChanged<String> onChanged;
-
-  const ModernSearchBox({Key? key, required this.onChanged}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassBox(
-      height: 40,
-      width: 250,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      borderRadius: ModderTheme.radiusS,
-      blur: 10,
-      tint: Colors.black12,
-      child: TextField(
-        onChanged: onChanged,
-        style: const TextStyle(color: ModderTheme.textPrimary, fontSize: 13),
-        decoration: const InputDecoration(
-          hintText: "Search",
-          hintStyle: TextStyle(color: Colors.white30),
-          border: InputBorder.none,
-          icon: Icon(Icons.search_rounded, color: Colors.white54, size: 18),
-          isDense: true,
-          contentPadding: EdgeInsets.only(bottom: 2),
         ),
-        cursorColor: ModderTheme.accent,
       ),
     );
   }

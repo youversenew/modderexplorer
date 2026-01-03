@@ -1,41 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'explorer_app.dart';
 import 'explorer_ui.dart';
 
 void main() {
-  runApp(const ModderFileManager());
+  // Tizim UI overlaylarini sozlash (Status bar va navigation bar ranglari)
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.transparent,
+  ));
+
+  runApp(const MacosFileManager());
 }
 
-class ModderFileManager extends StatelessWidget {
-  const ModderFileManager({Key? key}) : super(key: key);
+class MacosFileManager extends StatelessWidget {
+  const MacosFileManager({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Modder File Explorer',
+      title: 'Finder X',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
 
-      // Ilova uchun Dark Theme sozlamalari
+      // Ilova uchun Dark Theme (MacOS Style)
       darkTheme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: ModderTheme.background,
-        primaryColor: ModderTheme.accent,
-        fontFamily: 'Segoe UI', // Windows uchun standart shrift
-        useMaterial3: true,
+        scaffoldBackgroundColor: MacosTheme.background,
+        primaryColor: MacosTheme.accent,
+        fontFamily: 'Segoe UI', // Windowsda toza ko'rinish uchun
 
-        // Scrollbarlar Windows style'da ingichka bo'lishi uchun
+        // Context Menu va Dialoglar uchun style
+        dialogBackgroundColor: Colors.transparent,
+
+        // Scrollbar MacOS kabi ingichka
         scrollbarTheme: ScrollbarThemeData(
-          thumbColor:
-              MaterialStateProperty.all(ModderTheme.accent.withOpacity(0.5)),
-          thickness: MaterialStateProperty.all(4),
+          thumbColor: MaterialStateProperty.all(Colors.white24),
+          thickness: MaterialStateProperty.all(6),
           radius: const Radius.circular(10),
+          minThumbLength: 50,
         ),
 
         colorScheme: const ColorScheme.dark(
-          primary: ModderTheme.accent,
-          background: ModderTheme.background,
-          surface: ModderTheme.surface,
+          primary: MacosTheme.accent,
+          background: MacosTheme.background,
+          surface: MacosTheme.canvasColor,
+        ),
+
+        // Text Selection Color (MacOS Blue)
+        textSelectionTheme: const TextSelectionThemeData(
+          selectionColor: MacosTheme.selection,
+          selectionHandleColor: MacosTheme.accent,
         ),
       ),
 
