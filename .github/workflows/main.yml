@@ -1,6 +1,5 @@
 name: Windows Build
 
-# Kod main branchga tushganda yoki qo'lda bosilganda ishlaydi
 on:
   push:
     branches: [ "main" ]
@@ -12,46 +11,46 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1. Kodni Githubdan yuklab olish
+      # 1. Repo clone
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Flutter muhitini o'rnatish
+      # 2. Flutter SDK (CACHE YOQILGAN)
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           architecture: x64
+          cache: true
 
-      # 3. Keshni yoqish (Buildni tezlashtirish uchun)
-      - name: Pub Cache
+      # 3. Pub cache (dependency cache)
+      - name: Cache Pub Packages
         uses: actions/cache@v3
         with:
-          path: ${{ env.PUB_CACHE }}
+          path: |
+            ~/.pub-cache
+            ${{ env.PUB_CACHE }}
           key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pub-
 
-      # 4. Windows Config (Desktop supportni yoqish)
+      # 4. Windows desktop support
       - name: Enable Windows Support
         run: flutter config --enable-windows-desktop
 
-      # 5. Dependency'larni yuklash
+      # 5. Dependencies
       - name: Get Dependencies
         run: flutter pub get
 
-      # --- MUHIM QISM: Windows papkasini yaratish ---
-      # Bu buyruq sizda yo'q bo'lgan 'windows' papkasini
-      # va C++ runner fayllarini avtomatik generatsiya qiladi.
+      # ❗ Agar windows/ papka repo’da BO‘LSA — buni O‘CHIR
       - name: Create Windows Files
         run: flutter create --platforms=windows .
-      # ----------------------------------------------
 
-      # 6. Build jarayoni (Release versiya)
+      # 6. Release build
       - name: Build Windows App
-        run: flutter build windows --release
+        run: flutter build windows --release --no-tree-shake-icons
 
-      # 7. Tayyor fayllarni zip qilib olish (Artifact)
+      # 7. Artifact
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
