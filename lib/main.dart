@@ -1,43 +1,45 @@
 import 'package:flutter/material.dart';
+import 'explorer_app.dart';
+import 'explorer_ui.dart';
 
-void main() => runApp(MyApp());
+void main() {
+  runApp(const ModderFileManager());
+}
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-  // This widget is the root of your application.
+class ModderFileManager extends StatelessWidget {
+  const ModderFileManager({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // Application name
-      title: 'Flutter Hello World',
-      // Application theme data, you can set the colors for the application as
-      // you want
-      theme: ThemeData(
-        // useMaterial3: false,
-        primarySwatch: Colors.blue,
-      ),
-      // A widget which will be started on application startup
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
+      title: 'Modder File Explorer',
+      debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.dark,
 
-class MyHomePage extends StatelessWidget {
-  final String title;
-  const MyHomePage({super.key, required this.title});  
+      // Ilova uchun Dark Theme sozlamalari
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: ModderTheme.background,
+        primaryColor: ModderTheme.accent,
+        fontFamily: 'Segoe UI', // Windows uchun standart shrift
+        useMaterial3: true,
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        // The title text which will be shown on the action bar
-        title: Text(title),
-      ),
-      body: Center(
-        child: Text(
-          'Hello, World!',
+        // Scrollbarlar Windows style'da ingichka bo'lishi uchun
+        scrollbarTheme: ScrollbarThemeData(
+          thumbColor:
+              MaterialStateProperty.all(ModderTheme.accent.withOpacity(0.5)),
+          thickness: MaterialStateProperty.all(4),
+          radius: const Radius.circular(10),
+        ),
+
+        colorScheme: const ColorScheme.dark(
+          primary: ModderTheme.accent,
+          background: ModderTheme.background,
+          surface: ModderTheme.surface,
         ),
       ),
+
+      home: const ExplorerApp(),
     );
   }
 }
